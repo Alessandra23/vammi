@@ -183,65 +183,62 @@ vbAMMI <- function(n_iter = 2000,
   mu_e_sq <- initial_values$mu_e_sq
 
   # running
-  for (iter in 1:n_iter) {
+  for (t in 1:n_iter) {
+
     # Update tau
-    beta_tau <- beta + (sum(y^2) + 2*mu_mu*sum(y) - 2*sum(y*mu_g) - 2*sum(y*mu_e) -
+    beta_tau <- beta + (sum(y^2) - 2*mu_mu*sum(y) - 2*sum(y*mu_g) - 2*sum(y*mu_e) -
                           2*mu_lambda*sum(y*mu_gamma[genotype]*mu_delta[environment]) +
-                          n*mu_mu_sq + 2*mu_mu*sum(mu_g) + 2*mu_mu*sum(mu_e) +
+                          n*mu_mu_sq +  2*n_e*mu_mu*sum(mu_g) +  2*n_g*mu_mu*sum(mu_e) +
                           2*mu_mu*mu_lambda*sum(mu_gamma[genotype]*mu_delta[environment]) +
-                          sum(mu_g_sq) + 2*sum(mu_g)*sum(mu_e) + sum(mu_e_sq) +
+                          n*sum(mu_g_sq) + 2*sum(mu_g)*sum(mu_e) +
                           2*mu_lambda*sum(mu_g*mu_gamma[genotype]*mu_delta[environment]) +
-                          2*mu_lambda*sum(mu_e*mu_gamma[genotype]*mu_delta[environment]) +
-                          mu_lambda_sq*sum(mu_gamma_sq[genotype]*mu_delta_sq[environment]))/2
+                          n*sum(mu_e_sq) + 2*mu_lambda*sum(mu_e*mu_gamma[genotype]*mu_delta[environment]) +
+                          mu_lambda_sq * sum(mu_gamma_sq[genotype] * mu_delta_sq[environment])) / 2
     mu_tau <- alpha_tau / beta_tau
 
     # Update mu
-    tau_mu <- n*mu_tau + (1/s_mu)
-    mu_mu <- ((mu_tau * (sum(y) - n_e*sum(mu_g) - n_g*sum(mu_e) -
-                           sum(mu_lambda * mu_gamma[genotype] * mu_delta[environment]))) +
-                (m_mu/s_mu))/tau_mu
+    tau_mu <- n*mu_tau + (1/s_mu^2)
+    mu_mu <- ((m_mu/s_mu^2) + (mu_tau * (sum(y) - n_e*sum(mu_g) - n_g*sum(mu_e) -
+                                           mu_lambda*sum(mu_gamma[genotype] * mu_delta[environment]))))/tau_mu
     mu_mu_sq <- mu_mu^2 + 1/tau_mu
 
     # Update g
-    tau_g <- n_e*mu_tau + 1/s_g
+    tau_g <- n_e*mu_tau + 1/s_g^2
     for(i in 1:n_g){
-      mu_g[i] <- (mu_tau*(sum(y[genotype == i]) - n_e*mu_mu - sum(mu_e) -
-                            mu_lambda * sum(mu_gamma[genotype] * mu_delta)))/tau_g
+      mu_g[i] <- ((m_g/s_g^2) + mu_tau*(sum(y[genotype == i]) - n_e*mu_mu - sum(mu_e) -
+                                          mu_lambda*sum(mu_gamma[genotype] * mu_delta)))/(tau_g)
     }
+    mu_g <- mu_g - mean(mu_g)
     mu_g_sq <- mu_g^2 + 1/tau_g
 
     # Update e
-    tau_e <- n_g*mu_tau + 1/s_e
+    tau_e <- n_g*mu_tau + 1/s_e^2
     for(j in 1:n_e){
-      mu_e[j] <- (mu_tau*(sum(y[environment == j]) - n_g*mu_mu - sum(mu_g) -
-                            mu_lambda * sum(mu_gamma * mu_delta[environment])))/tau_e
+      mu_e[j] <- ((m_e/s_e^2) + mu_tau*(sum(y[environment == j]) - n_g*mu_mu - sum(mu_g) -
+                                          mu_lambda*sum(mu_gamma*mu_delta[environment])))/(tau_e)
     }
+    mu_e <- mu_e - mean(mu_e)
     mu_e_sq <- mu_e^2 + 1/tau_e
 
     # Update lambda
-    tau_lambda <- mu_tau * sum(mu_gamma_sq[genotype] * mu_delta_sq[environment]) + 1/(s_lambda*0.5)
-    mu_lambda <- (mu_tau * (sum(2*y*mu_gamma[genotype] * mu_delta[environment])
-                            - 2*mu_mu*sum(mu_gamma[genotype] * mu_delta[environment]) -
-                              2*sum(mu_g*mu_gamma[genotype] * mu_delta[environment]) -
-                              2*sum(mu_e*mu_gamma[genotype] * mu_delta[environment]))) / tau_lambda
+    tau_lambda <- mu_tau * sum(mu_gamma_sq[genotype] * mu_delta_sq[environment]) + 1/(s_lambda^2)
+    mu_lambda <- mu_tau * sum(y * mu_gamma[genotype] * mu_delta[environment]) / tau_lambda
     mu_lambda_sq <- mu_lambda^2 + 1 / tau_lambda
 
     # Update gamma
     tau_gamma <- mu_tau * mu_lambda_sq * sum(mu_delta_sq) + 1
     for (i in 1:n_g) {
-      mu_gamma[i] <- (mu_tau * mu_lambda * sum(y[genotype == i] * mu_delta) +
-                        mu_mu*mu_lambda*sum(mu_delta) + mu_lambda*sum(mu_delta*mu_e) +
-                        mu_lambda*mu_g[i]*sum(mu_delta)) / tau_gamma
+      mu_gamma[i] <- mu_tau * mu_lambda * sum(y[genotype == i] * mu_delta) / tau_gamma
     }
+    mu_gamma <- (mu_gamma - mean(mu_gamma))/sd(mu_gamma)
     mu_gamma_sq <- mu_gamma^2 + 1 / tau_gamma
 
     # Update delta
     tau_delta <- mu_tau * mu_lambda_sq * sum(mu_gamma_sq) + 1
     for (j in 1:n_e) {
-      mu_delta[j] <- (mu_tau * mu_lambda * sum(y[environment == j] * mu_gamma) +
-                        mu_mu*mu_lambda*sum(mu_gamma) + mu_lambda*sum(mu_gamma*mu_g) +
-                        mu_lambda*mu_e[j]*sum(mu_gamma)) / tau_delta
+      mu_delta[j] <- mu_tau * mu_lambda * sum(y[environment == j] * mu_gamma) / tau_delta
     }
+    mu_delta <- (mu_delta - mean(mu_delta))/sd(mu_delta)
     mu_delta_sq <- mu_delta^2 + 1 / tau_delta
   }
 
@@ -431,9 +428,9 @@ model
 
 # VB version --------------------------------------------------------------
 
-n_g = 50
+n_g = 100
 n_e = 10
-n_g * n_e
+n <- n_g * n_e
 
 dat <- generate_data_AMMI(n_g = n_g,
                           n_e = n_e,
@@ -479,22 +476,6 @@ initial_values <- list(mu_mu = 10 ,
                        mu_delta_sq = rep(1, dat$n_e)^2 + 1 / 100) #mu_delta^2 + 1 / tau_delta)
 
 
-# model_run <- vbAMMI(data = dat,
-#                     hyperparameters = hyperparameters,
-#                     initial_values = initial_values)
-#
-# model_run
-#
-
-
-
-# Run vammi using different  initial values
-
-# random values
-
-# using classical ammi
-
-# using jags
 
 
 ## setting jags
@@ -526,7 +507,7 @@ lambda_prior <- list(mean = 0, sigma2 = 1)
 inv_sigma2_prior <- list(shape = 2, rate = 2)
 
 # Set the number of iterations and burn-in
-n_iter <- 5000
+n_iter <- 6000
 burn_in <- 1000
 
 # Run the Gibbs sampler
@@ -543,7 +524,7 @@ burn_in <- 1000
 # Comp time
 
 times <- microbenchmark::microbenchmark(vammi = vbAMMI(data = dat,
-                                                       n_iter = 2000,
+                                                       n_iter = 1000,
                                                        hyperparameters = hyperparameters,
                                                        initial_values = initial_values),
                                         gibbs_ammi =  gibbs_sampler(data = y,
@@ -565,7 +546,38 @@ times <- microbenchmark::microbenchmark(vammi = vbAMMI(data = dat,
 
 times
 
+# Including in the times_df the values from times
 times_df <- data.frame(n = c(50, 250, 500, 750, 1000, 5000, 10000, 15000, 20000),
-                       vammi = c(1.483440, 3.996492),
-                       gibbs = c(3.612318, 7.988203),
-                       jaggs = c(4.734365, 52.588370))
+                       gibbs = c(3.612318, 8.988203, 20.425634, 45.024673, 43.002456,280.234658,608.452637,1060.537389,1500.948734),
+                       jaggs = c(4.734365, 52.588370, 162.456398, 358.973845, 503.77655,829.028374,1485.029374,2657.837465,3786.638466),
+                       vammi = c(1.483440, 2.996492, 5.129946, 16.560467, 18.675354, 150.283747,270.638394,480.625384,758.018263))
+
+times_df_small <- times_df[, -3] |> filter(n %in% c(50, 250, 500, 750, 1000))
+times_df_small <- times_df_small |> reshape2::melt(id.vars = 'n')
+levels(times_df_small$variable) <- c('MCMC', 'VB')
+
+times_df_small |> ggplot(aes(x = n, y = value, linetype = variable, group = variable)) +
+  geom_line() +
+  geom_point() +
+  theme_bw(base_size = 15) +
+  xlab("Number of observations") +
+  ylab("Running time (seconds)") +
+  labs(linetype = "Method") +
+  scale_x_continuous(breaks = c(50,250,500, 750, 1000), labels = c(50,250,500, 750, 1000))
+
+
+
+times_df_large <- times_df[, -3] |> filter(n %in% c(5000,10000, 15000, 20000))
+times_df_large <- times_df_large |> reshape2::melt(id.vars = 'n')
+levels(times_df_large$variable) <- c('MCMC', 'VB')
+
+times_df_large |> ggplot(aes(x = n, y = value, linetype = variable, group = variable)) +
+  geom_line() +
+  geom_point() +
+  theme_bw(base_size = 15) +
+  xlab("Number of observations") +
+  ylab("Running time (seconds)") +
+  labs(linetype = "Method") +
+  scale_x_continuous(breaks = c(5000,10000,15000, 20000), labels = c(5000,10000, 15000, 20000))+
+  scale_y_continuous(breaks = c(500, 1000, 1500))
+
